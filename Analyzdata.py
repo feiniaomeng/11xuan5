@@ -2,17 +2,32 @@
 # -*- coding:utf-8 -*-
 
 import fileinput
+import datetime
 from itertools import combinations, permutations
 import re
 import os
 import codecs
-#import SaveUrlAsFile
+
+import SaveUrlAsFile
 import ParseData
+
 import pandas as pd
-#import UrlSet
+import UrlSet
+
 OptiniumPath = '/Users/libo/workspace/spider/wangyi/11xuan5/optionium/'
+
 open_debug = 0
-open_debug_result = 1
+
+AnalzResultNameWithPath = '/home/libo/PycharmProjects/11xuanwu/analyzdata.result'
+
+
+def write_analyz_result_to_file(str, filename_with_path=AnalzResultNameWithPath):
+    print str
+    file_obj = codecs.open(filename_with_path, 'a', 'utf-8')
+    file_obj.write(str + '\n')
+    file_obj.flush();
+    file_obj.close()
+
 def analyz_data(file_name_with_path):
     all_result_in_one_day = []
     for line in fileinput.input(file_name_with_path):
@@ -42,13 +57,6 @@ def get_per_number_max_nohappened_times(oneday_results):
     return max_times_array
 
 
-def get_numbers_happen_times(oneday_results):
-    numbers_happen_times = dict.fromkeys(["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11"], 0)
-    for result in oneday_results:
-        happen_numbers = set(result)
-        for element in happen_numbers:
-            numbers_happen_times[element] += 1
-    return sorted(numbers_happen_times.items(), lambda x, y: cmp(x[1], y[1]), reverse=True)
 
 def get_oneday_hot_normal_cold_numbers(oneday_results):
 
@@ -88,9 +96,6 @@ def get_any_two_number():
     return any_two_number;
 
 
-
-
-
 def calc_bonus_with_one_period(buy_numbers=[], result_numbers=[]):
     bonus = 0
     if open_debug:
@@ -112,6 +117,23 @@ def cal_next_cost(total_cost, bonus_percent):
 
     return temp_cost
 
+def get_per_number_max_nohappeded_times(oneday_result):
+    max_time_array = [0] * 11
+    tmp_time_array = [0] * 11
+
+    all_numbers = set(['01', '02','03','04','05','06','07','08','09','10','11'])
+    for result in oneday_result:
+        happen_number = set(result)
+        nohappen_number = all_numbers - happen_number
+
+        for element in happen_number:
+            tmp_time_array[int(element) - 1] = 0
+        for element in nohappen_number:
+            key = int(element) - 1
+            tmp_time_array[key] += 1
+            if tmp_time_array[key] > max_time_array[key]:
+                max_time_array[key] = tmp_time_array[key]
+    return max_time_array
 
 def get_optinum_by_latest_day(one_day_results):
     optinums_result = {}
@@ -285,6 +307,19 @@ def normal_sorted_fun(x, y):
     else:
         return 0
 
+def get_numbers_happen_times(oneday_results):
+    numbers_happen_times = dict.fromkeys(["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11"], 0)
+    for result in oneday_results:
+        happen_numbers = set(result)
+        for element in happen_numbers:
+            numbers_happen_times[element] += 1
+    return sorted(numbers_happen_times.items(), lambda x, y: cmp(x[1], y[1]), reverse=True)
+
+def get_number_happen_times(number, oneday_results):
+    for number_happen_times in get_numbers_happen_times(oneday_results):
+        if number_happen_times[0] == number:
+            return number_happen_times[1]
+
 def get_next_buy_number_by_optionium_arg(oneday_results):
     optioninum_result = get_optinum_by_latest_day(oneday_results)
     hot_numbers, cold_numbers = get_hot_number_by_oneday_result(oneday_results)
@@ -298,6 +333,7 @@ def get_next_buy_number_by_optionium_arg(oneday_results):
     even_number = set(["06", "02", "08", "04", "10"])
     odd_number = set(["01", "05", "03", "07", "05", "09", "11"])
 
+    need_print = 0
     for result in optioninum_result:
         args = result[1].split(' ', 3)
         if int(args[0]) >= 0 and int(args[0]) < 3:
@@ -307,11 +343,39 @@ def get_next_buy_number_by_optionium_arg(oneday_results):
                     and (select_set & even_number) and (select_set & odd_number) \
                     and select_set & hot_numbers and len(select_set & cold_numbers) == 0 \
                     and len(select_set & oneday_cold_numbers) == 0:
-                        return result[0].split(' ', 2), result[1], 10 - int(args[1])
+                        print result[0].split(' ', 2), result[1], 10 - int(args[1])
+                        need_print = 1
+        else:
+            continue
+
+    if need_print:
+        print "---------------------------"
+    for result in optioninum_result:
+        args = result[1].split(' ', 3)
+        if int(args[0]) >= 0 and int(args[0]) < 3:
+            if int(args[1])< 10 :
+                select_set = set(result[0].split(' ', 2))
+                min = int(result[0].split(' ', 2)[0])
+                max = int(result[0].split(' ', 2)[1])
+
+                if min > max:
+                    min = max
+                    max = int(result[0].split(' ', 2)[0])
+
+                number1_happen_time = get_number_happen_times(result[0].split(' ', 2)[0], oneday_results)
+                number2_happen_time = get_number_happen_times(result[0].split(' ', 2)[1], oneday_results)
+                if number2_happen_time != number1_happen_time and (max % min != 0 or min == 1) \
+                    and (select_set & big_numbers) and (select_set & little_number) \
+                    and (select_set & even_number) and (select_set & odd_number) \
+                    and select_set & hot_numbers and len(select_set & cold_numbers) == 0 \
+                    and len(select_set & oneday_cold_numbers) == 0:
+                        if 10 - int(args[1]) < 5:
+                            return result[0].split(' ', 2), result[1], 5
+                        else:
+                            return result[0].split(' ', 2), result[1], 10 - int(args[1])
         else:
             pass
     return None, None, None
-
 
 def get_hot_number_by_oneday_result(ond_day_result):
     all_number_set = set(["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11"])
@@ -333,7 +397,6 @@ def get_hot_number_by_oneday_result(ond_day_result):
 
 def try_buy_numbers_use_optionium(oneday_results):
 
-
     buy_times = 10
     periord_times = 0
     continue_buy_times = buy_times
@@ -349,20 +412,19 @@ def try_buy_numbers_use_optionium(oneday_results):
     for oneday_result in oneday_results:
         periord_times = periord_times + 1
         if periord_times < 0:
-            continue;
+            continue
 
         if continue_buy_times >= buy_times:
             new_next_buy_number, select_args, buy_times = get_next_buy_number_by_optionium_arg(oneday_results[:periord_times-1])
             next_buy_number = new_next_buy_number
             if next_buy_number == None:
                 if periord_times == len(oneday_results) and 1:
-                    print "Don't Buy ", "periord_times= ", periord_times
+                    write_analyz_result_to_file("Don't Buy, period_times = %s"%(periord_times))
                 pass
             else:
                 next_buy_number = set(next_buy_number)
                 continue_buy_times = 0
                 skip_times = 0
-                #print "actualy buy with number " , list(next_buy_number), "periord_times= " , periord_times, "select_args = ", select_args
 
         if next_buy_number != None:
             oneday_hot_numbers, oneday_normal_numbers, oneday_cold_numbers = get_oneday_hot_normal_cold_numbers(
@@ -384,19 +446,20 @@ def try_buy_numbers_use_optionium(oneday_results):
             if bonus:
                 if 1:
                     max_continue_buy_times = max_continue_buy_times + continue_buy_times
-                    print "Win: " , list(next_buy_number) , " continue_buy_times= ", continue_buy_times, "max_continue_buy_times = " , max_continue_buy_times, "periord_times= " ,periord_times, "select_args = ", select_args, "buy_times = ", buy_times, 'oneday_result= ', oneday_result
+                    tmp_str = "Win: %s, period_times = %s, continue_buytimes = %s, max_continue_buy_times = %s, select_args = %s, buy_times = %s"\
+                                %(list(next_buy_number),periord_times, continue_buy_times, max_continue_buy_times, select_args, buy_times)
+                    write_analyz_result_to_file(str=tmp_str)
+
                     max_continue_buy_times = 0
                     if periord_times >= len(oneday_results):
                         temp_next_buy_number, temp_select_args, temp_buy_times = \
                             get_next_buy_number_by_optionium_arg(oneday_results)
-
-                        for tempresult in oneday_results[-4:]:
-                            print tempresult,
-                        print ""
                         if temp_next_buy_number:
-                            print "temp_next_buy_number = ", list(temp_next_buy_number), "periord_times= ", periord_times, "temp_select_args = ", temp_select_args
+                            tmp_str = "next_buy_number = %s, periord_times = %s, select_args = %s"%(list(temp_next_buy_number),periord_times, temp_select_args)
                         else:
-                            print "Don't Buy ", "periord_times= ", periord_times, "optioninum_result = ", optioninum_result
+                            tmp_str = "Don't Buy. period_times = %s"%(periord_times)
+
+                        write_analyz_result_to_file(str=tmp_str)
                 times_with_bonus += 1
                 total_bonus += 2 ** (continue_buy_times - skip_times)
 
@@ -404,12 +467,18 @@ def try_buy_numbers_use_optionium(oneday_results):
             else:
                 continue_buy_times += 1
                 if periord_times >= len(oneday_results)  and 1:
-                    print "current_buy_number = ", list(next_buy_number), "continue_buy_times= ", continue_buy_times, "skip_times = " , skip_times, "periord_times= ", periord_times, "select_args = ", select_args, "buy_times = ", buy_times, 'oneday_result= ', oneday_result
+                    tmp_str = "current_buy_number: %s, period_times = %s, continue_buytimes = %s, skip_times = %s, select_args = %s, buy_times = %s" \
+                              % (list(next_buy_number), periord_times, continue_buy_times, skip_times,
+                                 select_args, buy_times)
+                    write_analyz_result_to_file(str=tmp_str)
                 if continue_buy_times >= buy_times:
                     times_without_bonus += 1
                     max_continue_buy_times = max_continue_buy_times + buy_times
-                    if 1:
-                        print "Loss: ", list(next_buy_number), " continue_buy_times= ", continue_buy_times, "skip_times = " , skip_times, "periord_times= ", periord_times, "select_args = ", select_args, "buy_times = ", buy_times, 'oneday_result= ', oneday_result
+
+                    tmp_str = "Loss: %s, period_times = %s, continue_buytimes = %s, skip_times = %s, select_args = %s, buy_times = %s" \
+                              % (list(next_buy_number), periord_times, continue_buy_times, skip_times,
+                                 select_args, buy_times)
+                    write_analyz_result_to_file(str=tmp_str)
                     total_bonus -= 2 ** (continue_buy_times - skip_times)
                     continue_buy_times = buy_times
                     skip_times = 0
@@ -428,9 +497,71 @@ def analyze_all_days_result():
             buy_any_two_number(path + file)
             print "**********************************************************************************************"
 
+def get_today_buy_result():
+    today_url = UrlSet.get_today_url("http://kjh.55128.cn/")
+    print today_url
+    total_bonus = 0
+    save_filename_with_path = SaveUrlAsFile.get_and_save_url_as_file(today_url,"/home/libo/workspace/spider/wangyi/11xuan5/data/")
+    result_filename_with_path = ParseData.filter_one_day_data_and_save(save_filename_with_path)
+    oneday_results = analyz_data(result_filename_with_path)
+
+    tmp_total_bonus, tmp_bonus_times, tmp_nobonus_times = try_buy_numbers_use_optionium(oneday_results)
+
+    total_bonus += tmp_total_bonus
+
+    analyz_result_str = ("oneday_results_len = %s, total_bonus = %s, Win %s, Loss %s"%( len(oneday_results), total_bonus, tmp_bonus_times, tmp_nobonus_times))
+    write_analyz_result_to_file(analyz_result_str)
+
+    print "oneday_results_len = ", len(oneday_results), "total_bonus = ", total_bonus
+
+    results_len = len(oneday_results)
+
+    next_buy_number, select_args,buy_times = get_next_buy_number_by_optionium_arg(oneday_results)
+    for tempresult in oneday_results[-4:]:
+        print ("last_four_result = %s"%(tempresult))
+    analyz_result_str = ("next_buy_number = %s, select_args = %s, buy_times = %s"
+          %(next_buy_number, select_args, buy_times))
+    write_analyz_result_to_file(analyz_result_str)
+
+    print "results_len = ", results_len
+    print "next_buy_number = ", next_buy_number, "select_args = ", select_args, "buy_times = ", buy_times
+
+def get_today_buy_result_humen():
+    today_url = UrlSet.get_today_url("http://kjh.55128.cn/")
+    print today_url
+    total_bonus = 0
+    #save_filename_with_path = SaveUrlAsFile.get_and_save_url_as_file(today_url,"/home/libo/workspace/spider/wangyi/11xuan5/data/")
+    #result_filename_with_path = ParseData.filter_one_day_data_and_save(save_filename_with_path)
+    result_filename_with_path = "/home/libo/workspace/spider/wangyi/11xuan5/result/test.txt"
+    oneday_results = analyz_data(result_filename_with_path)
+
+    tmp_total_bonus, tmp_bonus_times, tmp_nobonus_times = try_buy_numbers_use_optionium(oneday_results)
+
+    total_bonus += tmp_total_bonus
+
+    analyz_result_str = ("oneday_results_len = %s, total_bonus = %s, Win %s, Loss %s"%( len(oneday_results), total_bonus, tmp_bonus_times, tmp_nobonus_times))
+    write_analyz_result_to_file(analyz_result_str)
+
+    print "oneday_results_len = ", len(oneday_results), "total_bonus = ", total_bonus
+
+    results_len = len(oneday_results)
+
+    next_buy_number, select_args,buy_times = get_next_buy_number_by_optionium_arg(oneday_results)
+    for tempresult in oneday_results[-4:]:
+        print ("last_four_result = %s"%(tempresult))
+    analyz_result_str = ("next_buy_number = %s, select_args = %s, buy_times = %s"
+          %(next_buy_number, select_args, buy_times))
+    write_analyz_result_to_file(analyz_result_str)
+
+    print "results_len = ", results_len
+    print "next_buy_number = ", next_buy_number, "select_args = ", select_args, "buy_times = ", buy_times
+
 if __name__ == '__main__':
     #print get_any_two_number()
-    path = "F:/Code/workspace/XXX/11xuan5/result/"
+
+    today_date = datetime.datetime.now().strftime('%Y-%m-%d')
+
+    path = "/home/libo/workspace/spider/wangyi/11xuan5/result/"
     if open_debug:
         files = os.listdir(path)
 
@@ -500,62 +631,33 @@ if __name__ == '__main__':
 
         print max_no_bonus_times_datafram
 
-    if 1:
+
+    if open_debug:
+        all_urls = UrlSet.get_all_url("http://kjh.55128.cn/", '2017-11-21', today_date)
+        for url in all_urls:
+            total_bonus = 0
+            print url
+            save_filename_with_path = SaveUrlAsFile.get_and_save_url_as_file(url, "/home/libo/workspace/spider/wangyi/11xuan5/data/")
+            #save_filename_with_path = '/home/libo/workspace/spider/wangyi/11xuan5/data/js11x5-kjjg-2017-11-12.htm'
+            result_filename_with_path = ParseData.filter_one_day_data_and_save(save_filename_with_path)
+            #result_filename_with_path = "/home/libo/workspace/spider/wangyi/11xuan5/result/2017-11-17.txt"
+            print "result_name_with_path = ", result_filename_with_path
+            oneday_results = analyz_data(result_filename_with_path)
+            #oneday_results.append(["01", "08", "04", "05", "11"])
+            results_len = len(oneday_results)
+            total_bonus = try_buy_numbers_use_optionium(oneday_results) + total_bonus
+            print "oneday_results_len = ", results_len, "total_bonus = " , total_bonus
+
+    if open_debug:
         files = os.listdir(path)
         file_number = 1
         for file in files:
-            if 1:
-                total_bonus = 0
-                open_debug_result = 0
-                #file = '2017-08-23.txt'
-                #print file
-                oneday_results = analyz_data("C:/Users/l00347608/PycharmProjects/fiveineleven/test_result.txt")
-
-                max_nohappen_times = get_per_number_max_nohappened_times(oneday_results)
-                print max_nohappen_times
-
-                results_len = len(oneday_results)
-                temp_total_bonus, times_with_bonus, times_without_bonus = try_buy_numbers_use_optionium(oneday_results)
-                total_bonus += temp_total_bonus
-
-                if times_with_bonus < 2 * times_without_bonus:
-                    print file
-                    if times_with_bonus - times_without_bonus < times_without_bonus:
-                        print "unnormal result:", "Win ", times_with_bonus, "   Loss ", times_without_bonus
-                break
-
-            #file_number -= 1
-            #if file_number < 0:
-            #    break
+            #print file
+            total_bonus = 0
+            oneday_results = analyz_data(path + file)
+            results_len = len(oneday_results)
+            total_bonus = try_buy_numbers_use_optionium(oneday_results)
+            print "oneday_results_len = ", results_len, "total_bonus = ", total_bonus
     if 1:
-        #today_url = "http://kjh.55128.cn/js11x5-kjjg-2017-11-05.htm"
-        #save_filename_with_path = SaveUrlAsFile.get_and_save_url_as_file(today_url,"/Users/libo/workspace/spider/wangyi/11xuan5/data/")
-
-        #result_filename_with_path = ParseData.filter_one_day_data_and_save(save_filename_with_path)
-        result_filename_with_path = "C:/Users/l00347608/PycharmProjects/fiveineleven/test_result.txt"
-        oneday_results = analyz_data(result_filename_with_path)
-
-        print result_filename_with_path, len(oneday_results)
-        results_len = len(oneday_results)
-        next_buy_number, select_args, buy_times = \
-            get_next_buy_number_by_optionium_arg(oneday_results)
-        print "results_len = ", results_len, "next_buy_number = ", next_buy_number, "select_args = ", select_args, "buy_times = ", buy_times
-
-        periord = 1
-        for result in oneday_results:
-            print "periord ", periord, "|", result , "|", get_numbers_happen_times(oneday_results[:periord-1])
-            periord += 1
-
-
-    #buy_any_two_number("/Users/libo/workspace/spider/wangyi/11xuan5/20171021final.txt")
-
-    #filename = "20171028.html"
-    #url_path = "http://caipiao.163.com/award/11xuan5/"
-    #save_path = "/Users/libo/workspace/spider/wangyi/11xuan5/"
-    #full_url = url_path + filename
-    #save_filename_with_path = SaveUrlAsFile.get_and_save_url_as_file(full_url, save_path)
-    #result_filename_with_path = ParseData.filter_one_day_data_and_save(save_filename_with_path)
-    #result_filename_with_path = "/Users/libo/workspace/spider/wangyi/11xuan5/result/2017-10-28.txt"
-    #optinum_result = get_optinum_by_latest_day(result_filename_with_path)
-    #print optinum_result
-    #write_the_optinums_in_file(get_optinum_filepath_with_result_file(result_filename_with_path), optinum_result)
+        get_today_buy_result()
+        #get_today_buy_result_humen()
